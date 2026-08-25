@@ -1,0 +1,25 @@
+[project]
+name = "prestamos"
+version = "0.1.0"
+description = "Sistema de prestamo de equipos de laboratorio (CLI)"
+requires-python = ">=3.11"
+dependencies = ["sentry-sdk>=2.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-v"
+markers = [
+    "funcional: caso funcional",
+    "borde: caso de borde",
+    "negativo: caso negativo o con entradas invalidas",
+    "combinacion: caso que combina reglas",
+    "escenario: escenario completo de punta a punta",
+]

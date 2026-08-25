@@ -1,0 +1,5 @@
+# Dependencias de ejecucion
+sentry-sdk>=2.0
+
+# Dependencias de desarrollo y pruebas
+pytest>=8.0

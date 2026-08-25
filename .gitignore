@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Datos de ejecucion (los de demo SI se versionan)
+datos/*.json
+!datos/demo/*.json
+logs/
+*.log
+
+# Secretos
+.env
+
+# Editores / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
