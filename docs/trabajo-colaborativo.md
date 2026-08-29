@@ -152,19 +152,69 @@ integrante sea dueno de un conjunto de funcionalidades que el otro pueda probar
 sin haberlas escrito**. Eso es lo que hace posible la tarea 7 (pruebas cruzadas)
 del enunciado: si ambos escriben todo, no hay nada que revisar con mirada fresca.
 
-| Integrante | Responsabilidades |
-| --- | --- |
-| _(Integrante 1)_ | Analisis de ambiguedades y requerimiento mejorado; modelos de dominio; persistencia JSON; solicitud, aprobacion y rechazo; consultas; casos funcionales y de borde; matriz de trazabilidad |
-| _(Integrante 2)_ | Reglas de negocio y maquina de estados; autenticacion y roles; errores, logs y Sentry; motor de reglas; entrega, devolucion y cancelacion; CLI y datos demo; casos negativos, combinados y escenario completo; estrategia de pruebas |
+### Por rebanada vertical, no por capa
 
-Compartido: documento principal, declaracion de uso de IA, README final.
-Individual e intransferible: la reflexion de cada uno.
+El primer reparto que consideramos dividia por capa (uno los modelos y la
+persistencia, otro las reglas y la observabilidad). Al dibujar el grafo de
+dependencias en [dag-dependencias.md](dag-dependencias.md) quedo a la vista que
+ese reparto produce **ocho traspasos sobre la cadena critica**: cada uno es una
+espera donde una persona termina y la otra recien ahi empieza.
 
-**Pruebas cruzadas.** El integrante 1 prueba lo que implemento el 2 (issue de
-pruebas cruzadas correspondiente) y viceversa. Los casos se disenan leyendo el
-requerimiento y las reglas de negocio, **no** el codigo del companero: si el caso
-se escribe mirando la implementacion, solo confirma lo que el codigo ya hace y
-deja de ser una prueba util.
+El reparto por rebanada vertical baja esos traspasos a cuatro. Cada integrante es
+dueno de una pregunta completa del dominio, con sus cimientos, su servicio y su
+persistencia:
+
+| | **Integrante A** &mdash; Identidad y solicitud | **Integrante B** &mdash; Ciclo de vida y visibilidad |
+| --- | --- | --- |
+| Pregunta que responde | quien existe, que equipos hay, quien pide que | que le pasa al prestamo y como se consulta |
+| Cimientos | #5 modelos, #6 persistencia, #7 auth | #8 errores/logs/Sentry, #9 motor de reglas |
+| Funcionalidad | #10 usuarios y equipos, #11 solicitud/aprobacion/rechazo | #12 entrega/devolucion, #13 consultas, #14 CLI, #15 datos demo |
+| Pruebas | #18 negativos, #19 combinados + escenario, #20 cruzadas | #16 funcionales, #17 borde, #21 cruzadas |
+| Documentos | #23 trazabilidad, #28 README final | #24 estrategia de pruebas |
+
+Diez issues cada uno. Los cimientos de cada rebanada son cadenas internas con un
+solo dueno de punta a punta, asi que no hay esperas dentro del bloque.
+
+**Juntos:** #1 ambiguedades, #2 reglas de negocio, #3 maquina de estados, #4 este
+documento, #22 actividades de V&V, #25 documento principal, #26 declaracion de IA.
+**Individual e intransferible:** #27, la reflexion de cada uno.
+
+`#3` se hace en una sesion de a dos y no se asigna. Es el issue con mayor costo de
+estar mal (todo el codigo de dominio y todas las pruebas lo leen) y el mas barato
+de discutir en voz alta frente a una tabla.
+
+### Como se trabaja en paralelo sin esperarse
+
+`#12` (entrega y devolucion) no necesita el *codigo* de `#11` (solicitudes):
+necesita el *contrato*. Una vez cerrada la maquina de estados, cualquiera de los
+dos puede fabricar un `Prestamo` en estado `APROBADO` como fixture y construir
+sobre el, sin esperar a que el companero termine.
+
+Eso es exactamente lo que compra el issue `#3`, y la razon por la que bloquea a
+todo lo demas.
+
+### Pruebas cruzadas
+
+**Regla: cada caso de prueba lo escribe quien NO implemento lo que ese caso
+ejercita.**
+
+De ahi sale el reparto de la tabla: B escribe los funcionales y los de borde,
+porque esos casos caen sobre la rebanada de A (limite de prestamos simultaneos,
+solapamiento de reservas, plazo maximo); A escribe los negativos y el escenario
+completo, porque caen sobre la rebanada de B (devolver un prestamo nunca
+entregado, cancelar despues de la entrega).
+
+Con esa regla los 15 casos **son** pruebas cruzadas por construccion y no hay que
+escribir dos baterias separadas.
+
+Los casos se disenan leyendo el requerimiento y las reglas de negocio, **no** el
+codigo del companero: si el caso se escribe mirando la implementacion, solo
+confirma lo que el codigo ya hace y deja de ser una prueba util.
+
+`#28` (README final) lo escribe A precisamente porque no hizo los datos demo:
+seguir el README sin conocer el sistema por dentro es la prueba de que el README
+sirve. Esa verificacion en limpio se documenta como actividad de validacion en
+`#22`.
 
 ## 7. Evidencia de cambios originados por una revision
 

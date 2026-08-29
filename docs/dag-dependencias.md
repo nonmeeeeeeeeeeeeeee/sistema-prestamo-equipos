@@ -114,34 +114,34 @@ Borde verde punteado: ya hecho, en revision.
 
 | Issue | Titulo | Hito | Depende de | Desbloquea | Dueno |
 | --- | --- | --- | --- | --- | --- |
-| #1 | Ambiguedades y requerimiento mejorado | M1 | — | #2 | Int. 1 |
-| #2 | Reglas de negocio RN-XX | M1 | #1 | #3 | Int. 2 |
-| #3 | Maquina de estados del prestamo | M1 | #2 | #5 | Int. 2 |
+| #1 | Ambiguedades y requerimiento mejorado | M1 | — | #2 | Ambos |
+| #2 | Reglas de negocio RN-XX | M1 | #1 | #3 | Ambos |
+| #3 | Maquina de estados del prestamo | M1 | #2 | #5 | Ambos |
 | #4 | Flujo de trabajo colaborativo | M1 | — | — | Ambos |
-| #5 | Modelos de dominio | M2 | #3 | #6, #9 | Int. 1 |
-| #6 | Persistencia en archivos JSON | M2 | #5 | #7 | Int. 1 |
-| #7 | Autenticacion y control por rol | M2 | #6 | #10 | Int. 2 |
-| #8 | Errores, logs de eventos y Sentry | M2 | — | #9 | Int. 2 |
-| #9 | Motor de reglas y transiciones | M2 | #5, #8 | #11 | Int. 2 |
-| #10 | Registro de usuarios y equipos | M3 | #7 | #11 | Int. 1 |
-| #11 | Solicitud, aprobacion y rechazo | M3 | #9, #10 | #12 | Int. 1 |
-| #12 | Entrega, devolucion y cancelacion | M3 | #11 | #13 | Int. 2 |
-| #13 | Consultas: vigentes, futuros, atrasados | M3 | #12 | #14 | Int. 1 |
-| #14 | CLI y menu interactivo | M3 | #13 | #15 | Int. 2 |
-| #15 | Datos de demostracion e init-demo | M3 | #14 | #16–#19 | Int. 2 |
-| #16 | 5 casos funcionales | M4 | #15 | #20, #21 | Int. 1 |
-| #17 | 4 casos de borde | M4 | #15 | #20, #21 | Int. 1 |
-| #18 | 3 casos negativos | M4 | #15 | #20, #21 | Int. 2 |
-| #19 | 2 combinados y 1 escenario completo | M4 | #15 | #20, #21 | Int. 2 |
-| #20 | Pruebas cruzadas: int. 1 revisa a int. 2 | M4 | #16–#19 | #22–#24, #27 | Int. 1 |
-| #21 | Pruebas cruzadas: int. 2 revisa a int. 1 | M4 | #16–#19 | #22–#24, #27 | Int. 2 |
+| #5 | Modelos de dominio | M2 | #3 | #6, #9 | A |
+| #6 | Persistencia en archivos JSON | M2 | #5 | #7 | A |
+| #7 | Autenticacion y control por rol | M2 | #6 | #10 | A |
+| #8 | Errores, logs de eventos y Sentry | M2 | — | #9 | B |
+| #9 | Motor de reglas y transiciones | M2 | #5, #8 | #11 | B |
+| #10 | Registro de usuarios y equipos | M3 | #7 | #11 | A |
+| #11 | Solicitud, aprobacion y rechazo | M3 | #9, #10 | #12 | A |
+| #12 | Entrega, devolucion y cancelacion | M3 | #11 | #13 | B |
+| #13 | Consultas: vigentes, futuros, atrasados | M3 | #12 | #14 | B |
+| #14 | CLI y menu interactivo | M3 | #13 | #15 | B |
+| #15 | Datos de demostracion e init-demo | M3 | #14 | #16–#19 | B |
+| #16 | 5 casos funcionales | M4 | #15 | #20, #21 | B |
+| #17 | 4 casos de borde | M4 | #15 | #20, #21 | B |
+| #18 | 3 casos negativos | M4 | #15 | #20, #21 | A |
+| #19 | 2 combinados y 1 escenario completo | M4 | #15 | #20, #21 | A |
+| #20 | Pruebas cruzadas: int. 1 revisa a int. 2 | M4 | #16–#19 | #22–#24, #27 | A |
+| #21 | Pruebas cruzadas: int. 2 revisa a int. 1 | M4 | #16–#19 | #22–#24, #27 | B |
 | #22 | 5 actividades de verificacion + 5 de validacion | M5 | #20, #21 | #25 | Ambos |
-| #23 | Matriz de trazabilidad (10+ req.) | M5 | #20, #21 | #25 | Int. 1 |
-| #24 | Estrategia de pruebas y evidencias | M5 | #20, #21 | #25 | Int. 2 |
+| #23 | Matriz de trazabilidad (10+ req.) | M5 | #20, #21 | #25 | A |
+| #24 | Estrategia de pruebas y evidencias | M5 | #20, #21 | #25 | B |
 | #25 | Documento principal integrador | M5 | #22–#24, #26, #27 | #28 | Ambos |
 | #26 | Declaracion de uso de IA | M5 | — | #25 | Ambos |
 | #27 | Reflexiones individuales | M5 | #20, #21 | #25 | C/u |
-| #28 | README final reproducible | M5 | #25 | — | Ambos |
+| #28 | README final reproducible | M5 | #25 | — | A |
 
 ## Los 4 issues tomables hoy
 
@@ -166,15 +166,22 @@ cierre, no hay una sola linea de dominio que se pueda escribir con confianza.
 persona. Es el issue con mayor costo de estar mal, y el mas barato de discutir en
 voz alta frente a una tabla.
 
-### 2. La espina cambia de dueno ocho veces
+### 2. La espina cambiaba de dueno ocho veces
 
-Recorriendo la cadena critica, la propiedad salta entre integrantes en
-`#1->#2`, `#3->#5`, `#6->#7`, `#7->#10`, `#11->#12`, `#12->#13`, `#13->#14` y
-`#15->#25`. Cada salto es una espera: uno termina y el otro recien ahi empieza.
+Con el reparto por capa que consideramos primero, la propiedad saltaba entre
+integrantes en `#1->#2`, `#3->#5`, `#6->#7`, `#7->#10`, `#11->#12`, `#12->#13`,
+`#13->#14` y `#15->#25`. Cada salto es una espera: uno termina y el otro recien
+ahi empieza.
 
-**Correccion:** reasignar `#12` y `#13` para que el bloque `#11-#13` quede en una
-sola cabeza. Baja de ocho traspasos a seis y elimina los dos mas frecuentes, que
-son los del medio de M3.
+**Correccion aplicada:** se cambio a un reparto por rebanada vertical, donde cada
+integrante es dueno de una pregunta completa del dominio con sus cimientos, su
+servicio y su persistencia. La espina quedo en
+`contrato (juntos) -> A -> B -> juntos -> A`: cuatro traspasos en lugar de ocho.
+El detalle esta en [trabajo-colaborativo.md](trabajo-colaborativo.md#6-reparto-de-trabajo).
+
+Lo que hace posible el paralelismo es que `#12` no necesita el *codigo* de `#11`,
+sino su *contrato*: cerrada la maquina de estados, cualquiera fabrica un
+`Prestamo` en estado `APROBADO` como fixture y construye sobre el.
 
 ### 3. Las pruebas estan todas al final, que es donde no hay tiempo
 
