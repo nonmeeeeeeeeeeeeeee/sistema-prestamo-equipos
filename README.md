@@ -79,8 +79,8 @@ pytest -v | tee docs/evidencias/pruebas/ejecucion-pytest.txt
 
 ## Autores
 
-- Nombre 1 - <rol> - @usuario-github
-- Nombre 2 - <rol> - @usuario-github
+- Benjamin Olguin- @nonmeeeeeeeeeeeeeee
+- Isaias Carte @IsaiasACF
 
 ## Licencia
 
