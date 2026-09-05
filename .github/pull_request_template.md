@@ -11,5 +11,5 @@ Casos ejecutados: CP-XX
 ## Checklist
 - [ ] Los IDs usados existen en docs/matriz-trazabilidad.md
 - [ ] Pruebas ejecutadas y evidencia adjunta
-- [ ] No se incluyen contrasenas, tokens ni secretos
+- [ ] No se incluyen contraseñas, tokens ni secretos
 - [ ] Revisado por el otro integrante
