@@ -32,11 +32,11 @@ def construir_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    cargar_env()
-    configurar_logging()
-    inicializar_sentry()
-
     try:
+        cargar_env()
+        configurar_logging()
+        inicializar_sentry()
+
         args = construir_parser().parse_args(argv)
         if args.comando is None:
             registrar_evento("cli_inicio", resultado="ok")
@@ -61,6 +61,20 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Comando no implementado: {args.comando}")
         return 1
     except ErrorDominio as exc:
-        capturar_excepcion(exc, contexto=exc.para_log())
+        _reportar_error(exc)
         print(f"Error: {exc.mensaje}")
         return 1
+    except Exception as exc:
+        _reportar_error(exc)
+        print("Error: No se pudo completar la operacion.")
+        return 1
+
+
+def _reportar_error(error: Exception) -> None:
+    """Intenta reportar el error sin depender de que observabilidad funcione."""
+    try:
+        contexto = error.para_log() if isinstance(error, ErrorDominio) else None
+        capturar_excepcion(error, contexto=contexto)
+    except Exception:
+        # No volver a usar logging/Sentry: pueden ser la causa del fallo.
+        pass
