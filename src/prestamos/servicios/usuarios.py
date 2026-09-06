@@ -211,6 +211,12 @@ class ServicioUsuarios:
         actor = self._auth.requiere_rol(Rol.ENCARGADO)
         actual = self._usuarios.obtener(id_usuario)
         if not actual.activo:
+            self._evento(
+                "usuario_desactivado",
+                actor=actor,
+                objetivo=actual.id,
+                resultado="sin_cambio",
+            )
             return actual
 
         actualizado = replace(actual, activo=False)
@@ -223,10 +229,22 @@ class ServicioUsuarios:
         return actualizado
 
     def reactivar(self, id_usuario: str) -> Usuario:
-        """Revierte la baja logica. Idempotente si ya estaba activo."""
+        """Revierte la baja logica. Idempotente si ya estaba activo.
+
+        Idempotente en el *estado*, no en la auditoria: el intento se registra
+        igual, con `resultado="sin_cambio"`, para que una accion administrativa
+        nunca quede sin evidencia (RN-18). Distinguirlo de `"ok"` permite
+        separar en el log lo que cambio algo de lo que no.
+        """
         actor = self._auth.requiere_rol(Rol.ENCARGADO)
         actual = self._usuarios.obtener(id_usuario)
         if actual.activo:
+            self._evento(
+                "usuario_reactivado",
+                actor=actor,
+                objetivo=actual.id,
+                resultado="sin_cambio",
+            )
             return actual
 
         actualizado = replace(actual, activo=True)

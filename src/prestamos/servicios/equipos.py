@@ -209,11 +209,22 @@ class ServicioEquipos:
         La baja es reversible: un equipo retirado por error, o reparado, vuelve
         con su historial intacto, que es justamente lo que la baja logica
         preserva frente a un borrado.
+
+        Sobre un equipo que ya esta `DISPONIBLE` no cambia nada, pero registra
+        el intento con `resultado="sin_cambio"`: idempotente en el estado, no en
+        la auditoria (RN-18).
         """
         actor = self._auth.requiere_rol(Rol.ENCARGADO)
         actual = self._equipos.obtener(normalizar_identificador(codigo))
 
         if actual.estado is EstadoEquipo.DISPONIBLE:
+            self._evento(
+                "equipo_reactivado",
+                actor=actor,
+                objetivo=actual.codigo,
+                resultado="sin_cambio",
+                estado_anterior=actual.estado.value,
+            )
             return actual
         if actual.estado not in ESTADOS_REACTIVABLES:
             self._rechazar(
@@ -249,6 +260,13 @@ class ServicioEquipos:
         codigo = normalizar_identificador(codigo)
         actual = self._equipos.obtener(codigo)
         if actual.estado is destino:
+            self._evento(
+                accion,
+                actor=actor,
+                objetivo=actual.codigo,
+                resultado="sin_cambio",
+                estado_anterior=actual.estado.value,
+            )
             return actual
 
         self._exigir_sin_prestamo_activo(codigo, actor=actor, accion=accion)

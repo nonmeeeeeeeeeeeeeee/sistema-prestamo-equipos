@@ -370,6 +370,32 @@ def test_desactivar_es_idempotente(servicio, sesion_encargado) -> None:
     assert servicio.desactivar("u1").activo is False
 
 
+def test_una_baja_repetida_deja_evidencia_en_el_log(
+    servicio, sesion_encargado, log_pruebas
+) -> None:
+    """Idempotente en el estado, no en la auditoria: el DoD de #10 pide que
+    toda operacion escriba en el log, tambien la que no cambia nada."""
+    _, ruta = log_pruebas
+    _alta_solicitante(servicio)
+    servicio.desactivar("u1")
+    servicio.desactivar("u1")
+
+    bajas = [e for e in _eventos(ruta) if e["accion"] == "usuario_desactivado"]
+    assert [e["resultado"] for e in bajas] == ["ok", "sin_cambio"]
+    assert bajas[-1]["contexto"]["objetivo"] == "u1"
+
+
+def test_una_reactivacion_redundante_deja_evidencia_en_el_log(
+    servicio, sesion_encargado, log_pruebas
+) -> None:
+    _, ruta = log_pruebas
+    _alta_solicitante(servicio)
+    servicio.reactivar("u1")
+
+    eventos = [e for e in _eventos(ruta) if e["accion"] == "usuario_reactivado"]
+    assert [e["resultado"] for e in eventos] == ["sin_cambio"]
+
+
 # ------------------------------------------- Proteccion del ultimo Encargado
 
 

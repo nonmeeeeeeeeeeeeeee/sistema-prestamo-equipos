@@ -400,6 +400,31 @@ def test_reactivar_un_equipo_disponible_es_idempotente(
     assert servicio.reactivar("M-01").estado is EstadoEquipo.DISPONIBLE
 
 
+def test_una_baja_repetida_deja_evidencia_en_el_log(
+    servicio, sesion_encargado, log_pruebas
+) -> None:
+    """Idempotente en el estado, no en la auditoria (DoD de #10)."""
+    _, ruta = log_pruebas
+    _alta(servicio)
+    servicio.dar_de_baja("M-01")
+    servicio.dar_de_baja("M-01")
+
+    bajas = [e for e in _eventos(ruta) if e["accion"] == "equipo_dado_de_baja"]
+    assert [e["resultado"] for e in bajas] == ["ok", "sin_cambio"]
+    assert bajas[-1]["contexto"]["estado_anterior"] == "BAJA"
+
+
+def test_una_reactivacion_redundante_deja_evidencia_en_el_log(
+    servicio, sesion_encargado, log_pruebas
+) -> None:
+    _, ruta = log_pruebas
+    _alta(servicio)
+    servicio.reactivar("M-01")
+
+    eventos = [e for e in _eventos(ruta) if e["accion"] == "equipo_reactivado"]
+    assert [e["resultado"] for e in eventos] == ["sin_cambio"]
+
+
 # --------------------------------------------------------------- Listado
 
 
