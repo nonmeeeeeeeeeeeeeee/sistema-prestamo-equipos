@@ -16,7 +16,8 @@ from typing import Callable, Iterable
 from prestamos.errores import ErrorAutorizacion, ErrorValidacion
 from prestamos.modelos import Equipo, EstadoEquipo, EstadoPrestamo, Prestamo, Rol, Usuario
 from prestamos.reglas import EventoTransicion, validar_transicion
-from prestamos.repositorios.json_repo import RepositorioJson, directorio_datos
+from prestamos.repositorios.fabricas import repositorio_equipos, repositorio_prestamos
+from prestamos.repositorios.json_repo import RepositorioJson
 
 
 class ServicioPrestamos:
@@ -29,13 +30,8 @@ class ServicioPrestamos:
         *,
         datos_dir: str | Path | None = None,
     ) -> None:
-        raiz = Path(datos_dir) if datos_dir is not None else directorio_datos()
-        self.repo_prestamos = repo_prestamos or RepositorioJson(
-            raiz / "solicitudes.json", Prestamo, "id"
-        )
-        self.repo_equipos = repo_equipos or RepositorioJson(
-            raiz / "equipos.json", Equipo, "codigo"
-        )
+        self.repo_prestamos = repo_prestamos or repositorio_prestamos(datos_dir)
+        self.repo_equipos = repo_equipos or repositorio_equipos(datos_dir)
 
     def registrar_entrega(
         self,
