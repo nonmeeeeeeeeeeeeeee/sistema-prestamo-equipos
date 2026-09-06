@@ -635,7 +635,8 @@ def test_solicitante_solo_consulta_prestamos_propios(
             id_usuario="sol-2",
         )
 
-    assert exc_info.value.regla == "RN-17"
+    assert exc_info.value.regla == "RN-19"
+    assert "RN-19" in exc_info.value.mensaje
 
 
 def test_consultas_validan_usuario_inactivo_o_ausente_y_filtros_vacios(

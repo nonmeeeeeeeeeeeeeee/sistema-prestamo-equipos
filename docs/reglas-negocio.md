@@ -25,6 +25,7 @@ menos un caso de prueba.
 | RN-16 | Los préstamos se clasifican como futuros, vigentes o atrasados según estado y fecha actual. | Al consultar préstamos. | Futuro: aprobado con fecha de inicio posterior a hoy. Vigente: entregado y dentro del plazo. Atrasado: entregado con fecha de término vencida. | AMB-11 / RF-12 | `src/prestamos/servicios/prestamos.py` | CP-29, CP-30 |
 | RN-17 | El sistema debe validar entradas inválidas antes de persistir cambios. | Al recibir datos desde CLI o servicios. | Campos vacíos, fechas inválidas, IDs inexistentes, roles inválidos, estados inválidos y duplicados se rechazan con mensaje claro. | AMB-13 / RF-01 / RF-03 / RF-05 | `src/prestamos/cli.py`, `src/prestamos/reglas.py` | CP-31, CP-32 |
 | RN-18 | Los eventos relevantes se registran en logs sin incluir contraseñas. | Al iniciar sesión, crear solicitudes, aprobar, rechazar, entregar, devolver, cancelar o detectar errores. | Se registra el evento y contexto no sensible; las contraseñas y secretos no se escriben en logs. | AMB-14 / RF-13 | `src/prestamos/logging_conf.py`, `src/prestamos/observabilidad.py` | CP-33, CP-34 |
+| RN-19 | El Solicitante solo puede consultar préstamos propios y el Encargado puede consultar todos, con filtros por usuario o equipo. | Al consultar préstamos futuros, vigentes o atrasados. | Si un solicitante intenta consultar préstamos de otro usuario, la operación se rechaza; el encargado puede consultar todos los préstamos o aplicar filtros por usuario/equipo. | AMB-02 / AMB-11 / RF-12 | `src/prestamos/servicios/prestamos.py` | CP-29, CP-30 |
 
 ## 2. Alcance
 
@@ -41,7 +42,7 @@ El sistema sí contempla:
 - Creación de solicitudes de reserva o préstamo.
 - Aprobación y rechazo de solicitudes por parte del encargado.
 - Registro de entregas, devoluciones y cancelaciones.
-- Consulta de préstamos futuros, vigentes y atrasados.
+- Consulta de préstamos futuros, vigentes y atrasados con visibilidad según rol.
 - Validación de reglas críticas antes de persistir cambios.
 - Logs de eventos relevantes y errores sin registrar contraseñas.
 - Datos de demostración para que el revisor pueda ejecutar el flujo principal.
@@ -86,7 +87,7 @@ El sistema no contempla:
 | SUP-09 | Para aprobar se valida solicitante activo, equipo disponible, fechas válidas, plazo máximo y límite de equipos activos. | Resuelve AMB-08 y define criterios objetivos para el encargado. | Si el cliente usa criterios adicionales, el flujo de aprobación quedaría incompleto. |
 | SUP-10 | Los estados de solicitud/préstamo serán solicitada, aprobada, rechazada, cancelada, entregada, devuelta y atrasada. | Resuelve AMB-09 y habilita una máquina de estados verificable. | Si faltan estados, algunas situaciones reales no se representarían bien. |
 | SUP-11 | El solicitante puede cancelar solicitudes solicitadas o aprobadas antes de la entrega, pero no préstamos entregados. | Resuelve AMB-10 y evita cancelar préstamos físicos ya retirados. | Si el laboratorio permite cancelaciones tardías, habría que modelarlas como otro flujo. |
-| SUP-12 | Futuro significa aprobado con fecha de inicio posterior a hoy; vigente significa entregado dentro del plazo; atrasado significa entregado con fecha de término vencida. | Resuelve AMB-11 y hace verificables las consultas. | Si el cliente clasifica distinto, los reportes podrían ser confusos. |
+| SUP-12 | Futuro significa aprobado con fecha de inicio posterior a hoy; vigente significa entregado dentro del plazo; atrasado significa entregado con fecha de término vencida; la visibilidad de esas consultas depende del rol. | Resuelve AMB-11 y RN-19 al hacer verificables las consultas y sus permisos. | Si el cliente clasifica distinto o requiere otros permisos, los reportes podrían ser confusos o demasiado restrictivos. |
 | SUP-13 | La autenticación será local y básica, con contraseñas de datos de demostración. | Resuelve AMB-12 y evita depender de sistemas externos. | Si se exige autenticación institucional, habría que cambiar el diseño. |
 | SUP-14 | Se validarán campos obligatorios, fechas, rangos, roles, estados, duplicados e IDs inexistentes antes de persistir. | Resuelve AMB-13 y reduce corrupción de datos. | Si se omite una validación crítica, podrían guardarse datos inconsistentes. |
 | SUP-15 | Se registrarán eventos de login, solicitudes, aprobaciones, rechazos, entregas, devoluciones, cancelaciones y errores, sin contraseñas. | Resuelve AMB-14 y permite auditoría básica sin exponer secretos. | Si el cliente requiere auditoría más detallada, los logs podrían ser insuficientes. |

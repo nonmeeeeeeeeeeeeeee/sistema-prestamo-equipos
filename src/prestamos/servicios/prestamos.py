@@ -2,7 +2,8 @@
 
 Este servicio orquesta persistencia JSON y motor de reglas. No decide si una
 transicion es valida por su cuenta: antes de guardar cualquier cambio llama a
-``prestamos.reglas.validar_transicion`` con el contexto necesario.
+``prestamos.reglas.validar_transicion`` con el contexto necesario. Las consultas
+clasifican por RN-16 y aplican visibilidad por rol segun RN-19.
 """
 
 from __future__ import annotations
@@ -171,7 +172,7 @@ class ServicioPrestamos:
         id_usuario: str | None = None,
         codigo_equipo: str | None = None,
     ) -> list[Prestamo]:
-        """Consulta futuros: APROBADA con inicio posterior a hoy (RN-16)."""
+        """Consulta futuros: APROBADA con inicio posterior a hoy (RN-16/RN-19)."""
 
         hoy = fecha_actual or date.today()
         return self._consultar(
@@ -192,7 +193,7 @@ class ServicioPrestamos:
         id_usuario: str | None = None,
         codigo_equipo: str | None = None,
     ) -> list[Prestamo]:
-        """Consulta vigentes: ENTREGADA sin devolucion y dentro del plazo (RN-16)."""
+        """Consulta vigentes: ENTREGADA sin devolucion y dentro del plazo (RN-16/RN-19)."""
 
         hoy = fecha_actual or date.today()
         return self._consultar(
@@ -214,7 +215,7 @@ class ServicioPrestamos:
         id_usuario: str | None = None,
         codigo_equipo: str | None = None,
     ) -> list[Prestamo]:
-        """Consulta atrasados sin modificar estados persistidos (RN-16)."""
+        """Consulta atrasados sin modificar estados persistidos (RN-16/RN-19)."""
 
         hoy = fecha_actual or date.today()
         return self._consultar(
@@ -293,14 +294,16 @@ class ServicioPrestamos:
         if usuario.rol is Rol.SOLICITANTE:
             if id_filtrado is not None and id_filtrado != usuario.id:
                 raise ErrorAutorizacion(
-                    "El solicitante solo puede consultar sus propios prestamos (RN-17).",
-                    regla="RN-17",
+                    "El solicitante solo puede consultar sus propios prestamos (RN-19).",
+                    regla="RN-19",
                     detalles={"usuario": usuario.id, "id_usuario": id_filtrado},
                 )
             return usuario.id
         if usuario.rol is Rol.ENCARGADO:
             return id_filtrado
 
+        # Defensa ante datos inconsistentes o futuras extensiones de Rol: hoy
+        # solo existen SOLICITANTE y ENCARGADO, cubiertos arriba.
         raise ErrorAutorizacion(
             "El rol del usuario no esta autorizado para consultar prestamos (RN-01).",
             regla="RN-01",
