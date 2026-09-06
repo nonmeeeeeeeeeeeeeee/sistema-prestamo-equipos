@@ -138,14 +138,14 @@ def test_transiciones_t01_a_t09_tienen_casos_exitosos() -> None:
             prestamo(),
             EventoTransicion.CANCELAR_SOLICITUD,
             usuario(),
-            {"fecha_actual": HOY},
+            {"fecha_actual": HOY, "motivo_cancelacion": "Ya no se requiere"},
         ),
         (
             "T-05",
             prestamo(estado=EstadoPrestamo.APROBADA),
             EventoTransicion.CANCELAR_SOLICITUD,
             usuario(),
-            {"fecha_actual": HOY},
+            {"fecha_actual": HOY, "motivo_cancelacion": "Cambio de plan"},
         ),
         (
             "T-06",
@@ -363,6 +363,7 @@ def test_cancelar_permite_solicitante_dueno_y_bloquea_terceros_con_rn15() -> Non
         EventoTransicion.CANCELAR_SOLICITUD,
         usuario(),
         fecha_actual=HOY,
+        motivo_cancelacion="Ya no se usara",
     )
     assert valida.id == "T-04"
 
