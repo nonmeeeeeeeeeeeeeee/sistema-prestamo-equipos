@@ -518,8 +518,9 @@ def _validar_cancelacion(
             regla="RN-15",
             detalles={"usuario": usuario.id, "id_solicitante": prestamo.id_solicitante},
         )
-    if usuario.rol is Rol.ENCARGADO:
-        _validar_motivo(motivo_cancelacion or prestamo.motivo_cancelacion, "cancelacion", "RN-15")
+    _validar_motivo(
+        motivo_cancelacion or prestamo.motivo_cancelacion, "cancelacion", "RN-15"
+    )
 
 
 def _validar_entrega(
@@ -546,7 +547,11 @@ def _validar_entrega(
                 regla="RN-17",
                 detalles={"equipo": codigo},
             )
-        if equipo.estado in {EstadoEquipo.MANTENCION, EstadoEquipo.BAJA}:
+        if equipo.estado in {
+            EstadoEquipo.PRESTADO,
+            EstadoEquipo.MANTENCION,
+            EstadoEquipo.BAJA,
+        }:
             raise ErrorValidacion(
                 f"El equipo {codigo} no esta disponible fisicamente (RN-13).",
                 regla="RN-13",
