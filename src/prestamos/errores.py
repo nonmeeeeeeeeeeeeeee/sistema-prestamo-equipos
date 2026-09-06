@@ -63,3 +63,18 @@ class TransicionNoPermitida(ErrorDominio):
 
 class RecursoNoEncontrado(ErrorDominio):
     codigo = "RECURSO_NO_ENCONTRADO"
+
+
+class ErrorPersistencia(ErrorDominio):
+    """Falla al leer o escribir los archivos JSON de `datos/`.
+
+    Es distinto de `ErrorValidacion` a proposito: aquel describe una entrada
+    invalida del usuario (RN-17), este describe una falla de integridad del
+    almacenamiento. Separarlos permite que la matriz de trazabilidad y Sentry
+    distingan "alguien tipeo mal una fecha" de "el archivo se corrompio".
+
+    `detalles` nunca debe incluir el contenido del archivo: `usuarios.json`
+    guarda `hash_contrasena` y `para_log()` viaja a logs y a Sentry (RN-18).
+    """
+
+    codigo = "ERROR_PERSISTENCIA"
