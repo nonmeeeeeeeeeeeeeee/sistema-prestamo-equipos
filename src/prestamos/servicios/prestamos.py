@@ -1,4 +1,4 @@
-"""Caso de uso de entrega, devolucion, atraso y cancelacion.
+"""Caso de uso de entrega, devolucion, atraso, cancelacion y consultas.
 
 Este servicio orquesta persistencia JSON y motor de reglas. No decide si una
 transicion es valida por su cuenta: antes de guardar cualquier cambio llama a
@@ -10,9 +10,10 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import date
 from pathlib import Path
-from typing import Iterable
+from typing import Callable, Iterable
 
-from prestamos.modelos import Equipo, EstadoEquipo, EstadoPrestamo, Prestamo, Usuario
+from prestamos.errores import ErrorAutorizacion, ErrorValidacion
+from prestamos.modelos import Equipo, EstadoEquipo, EstadoPrestamo, Prestamo, Rol, Usuario
 from prestamos.reglas import EventoTransicion, validar_transicion
 from prestamos.repositorios.json_repo import RepositorioJson, directorio_datos
 
@@ -162,6 +163,76 @@ class ServicioPrestamos:
         self.repo_prestamos.guardar(actualizado)
         return actualizado
 
+    def prestamos_futuros(
+        self,
+        usuario: Usuario | None,
+        *,
+        fecha_actual: date | None = None,
+        id_usuario: str | None = None,
+        codigo_equipo: str | None = None,
+    ) -> list[Prestamo]:
+        """Consulta futuros: APROBADA con inicio posterior a hoy (RN-16)."""
+
+        hoy = fecha_actual or date.today()
+        return self._consultar(
+            usuario,
+            id_usuario=id_usuario,
+            codigo_equipo=codigo_equipo,
+            clasificador=lambda prestamo: (
+                prestamo.estado is EstadoPrestamo.APROBADA
+                and prestamo.fecha_inicio > hoy
+            ),
+        )
+
+    def prestamos_vigentes(
+        self,
+        usuario: Usuario | None,
+        *,
+        fecha_actual: date | None = None,
+        id_usuario: str | None = None,
+        codigo_equipo: str | None = None,
+    ) -> list[Prestamo]:
+        """Consulta vigentes: ENTREGADA sin devolucion y dentro del plazo (RN-16)."""
+
+        hoy = fecha_actual or date.today()
+        return self._consultar(
+            usuario,
+            id_usuario=id_usuario,
+            codigo_equipo=codigo_equipo,
+            clasificador=lambda prestamo: (
+                prestamo.estado is EstadoPrestamo.ENTREGADA
+                and prestamo.fecha_devolucion is None
+                and prestamo.fecha_inicio <= hoy <= prestamo.fecha_termino
+            ),
+        )
+
+    def prestamos_atrasados(
+        self,
+        usuario: Usuario | None,
+        *,
+        fecha_actual: date | None = None,
+        id_usuario: str | None = None,
+        codigo_equipo: str | None = None,
+    ) -> list[Prestamo]:
+        """Consulta atrasados sin modificar estados persistidos (RN-16)."""
+
+        hoy = fecha_actual or date.today()
+        return self._consultar(
+            usuario,
+            id_usuario=id_usuario,
+            codigo_equipo=codigo_equipo,
+            clasificador=lambda prestamo: (
+                prestamo.fecha_devolucion is None
+                and (
+                    prestamo.estado is EstadoPrestamo.ATRASADA
+                    or (
+                        prestamo.estado is EstadoPrestamo.ENTREGADA
+                        and prestamo.fecha_termino < hoy
+                    )
+                )
+            ),
+        )
+
     def _preparar_atraso_si_corresponde(
         self,
         prestamo: Prestamo,
@@ -180,6 +251,72 @@ class ServicioPrestamos:
             )
             return replace(prestamo, estado=EstadoPrestamo.ATRASADA), True
         return prestamo, False
+
+    def _consultar(
+        self,
+        usuario: Usuario | None,
+        *,
+        id_usuario: str | None,
+        codigo_equipo: str | None,
+        clasificador: Callable[[Prestamo], bool],
+    ) -> list[Prestamo]:
+        id_filtrado = self._id_usuario_visible(usuario, id_usuario)
+        equipo_filtrado = self._filtro_texto(codigo_equipo, "codigo_equipo")
+        resultado: list[Prestamo] = []
+        for prestamo in self.repo_prestamos.listar():
+            if id_filtrado is not None and prestamo.id_solicitante != id_filtrado:
+                continue
+            if equipo_filtrado is not None and equipo_filtrado not in prestamo.equipos:
+                continue
+            if clasificador(prestamo):
+                resultado.append(prestamo)
+        return resultado
+
+    def _id_usuario_visible(
+        self,
+        usuario: Usuario | None,
+        id_usuario: str | None,
+    ) -> str | None:
+        if usuario is None:
+            raise ErrorAutorizacion(
+                "La consulta requiere un usuario autenticado (RN-02).",
+                regla="RN-02",
+            )
+        if not usuario.activo:
+            raise ErrorAutorizacion(
+                "El usuario debe estar activo para consultar prestamos (RN-02).",
+                regla="RN-02",
+                detalles={"usuario": usuario.id},
+            )
+
+        id_filtrado = self._filtro_texto(id_usuario, "id_usuario")
+        if usuario.rol is Rol.SOLICITANTE:
+            if id_filtrado is not None and id_filtrado != usuario.id:
+                raise ErrorAutorizacion(
+                    "El solicitante solo puede consultar sus propios prestamos (RN-17).",
+                    regla="RN-17",
+                    detalles={"usuario": usuario.id, "id_usuario": id_filtrado},
+                )
+            return usuario.id
+        if usuario.rol is Rol.ENCARGADO:
+            return id_filtrado
+
+        raise ErrorAutorizacion(
+            "El rol del usuario no esta autorizado para consultar prestamos (RN-01).",
+            regla="RN-01",
+            detalles={"rol": getattr(usuario.rol, "value", usuario.rol)},
+        )
+
+    def _filtro_texto(self, valor: str | None, campo: str) -> str | None:
+        if valor is None:
+            return None
+        if not isinstance(valor, str) or not valor.strip():
+            raise ErrorValidacion(
+                f"El filtro '{campo}' no puede estar vacio (RN-17).",
+                regla="RN-17",
+                detalles={"campo": campo},
+            )
+        return valor.strip()
 
     def _equipos_de(self, prestamo: Prestamo) -> dict[str, Equipo]:
         return {codigo: self.repo_equipos.obtener(codigo) for codigo in prestamo.equipos}
@@ -260,4 +397,52 @@ def marcar_atraso(
         id_prestamo,
         usuario=usuario,
         fecha_actual=fecha_actual,
+    )
+
+
+def prestamos_futuros(
+    usuario: Usuario | None,
+    *,
+    fecha_actual: date | None = None,
+    id_usuario: str | None = None,
+    codigo_equipo: str | None = None,
+    datos_dir: str | Path | None = None,
+) -> list[Prestamo]:
+    return crear_servicio_prestamos(datos_dir=datos_dir).prestamos_futuros(
+        usuario,
+        fecha_actual=fecha_actual,
+        id_usuario=id_usuario,
+        codigo_equipo=codigo_equipo,
+    )
+
+
+def prestamos_vigentes(
+    usuario: Usuario | None,
+    *,
+    fecha_actual: date | None = None,
+    id_usuario: str | None = None,
+    codigo_equipo: str | None = None,
+    datos_dir: str | Path | None = None,
+) -> list[Prestamo]:
+    return crear_servicio_prestamos(datos_dir=datos_dir).prestamos_vigentes(
+        usuario,
+        fecha_actual=fecha_actual,
+        id_usuario=id_usuario,
+        codigo_equipo=codigo_equipo,
+    )
+
+
+def prestamos_atrasados(
+    usuario: Usuario | None,
+    *,
+    fecha_actual: date | None = None,
+    id_usuario: str | None = None,
+    codigo_equipo: str | None = None,
+    datos_dir: str | Path | None = None,
+) -> list[Prestamo]:
+    return crear_servicio_prestamos(datos_dir=datos_dir).prestamos_atrasados(
+        usuario,
+        fecha_actual=fecha_actual,
+        id_usuario=id_usuario,
+        codigo_equipo=codigo_equipo,
     )
