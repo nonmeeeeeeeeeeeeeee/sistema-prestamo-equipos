@@ -10,8 +10,10 @@ formato, no el costo de la KDF.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+import secrets
 from pathlib import Path
 
 import pytest
@@ -154,6 +156,43 @@ def test_iteraciones_invalidas_son_error_de_programacion() -> None:
 def test_hash_corrupto_levanta_error_de_persistencia(almacenado: str) -> None:
     with pytest.raises(ErrorPersistencia):
         verificar_contrasena(CONTRASENA, almacenado)
+
+
+def test_credencial_truncada_es_corrupcion_y_no_contrasena_equivocada() -> None:
+    """Una sal o un digest recortados no pueden pasar por "clave incorrecta".
+
+    Sin la comprobacion de largos, `hmac.compare_digest` simplemente devolveria
+    False y un `usuarios.json` truncado se veria igual que un typo del usuario.
+    """
+    algoritmo, iteraciones, sal, digest = hash_contrasena(
+        CONTRASENA, iteraciones=1
+    ).split("$")
+
+    with pytest.raises(ErrorPersistencia) as sal_corta:
+        verificar_contrasena(CONTRASENA, f"{algoritmo}${iteraciones}${sal[:2]}${digest}")
+    with pytest.raises(ErrorPersistencia) as digest_corto:
+        verificar_contrasena(CONTRASENA, f"{algoritmo}${iteraciones}${sal}${digest[:2]}")
+    with pytest.raises(ErrorPersistencia) as digest_largo:
+        verificar_contrasena(
+            CONTRASENA, f"{algoritmo}${iteraciones}${sal}${digest}00"
+        )
+
+    assert sal_corta.value.detalles["motivo"] == "sal_demasiado_corta"
+    assert digest_corto.value.detalles["motivo"] == "largo_de_digest_invalido"
+    assert digest_largo.value.detalles["motivo"] == "largo_de_digest_invalido"
+
+
+def test_una_sal_mas_larga_que_la_actual_sigue_siendo_valida() -> None:
+    """El minimo protege de truncamientos sin congelar `BYTES_DE_SAL`.
+
+    Si algun dia la constante de generacion sube, las credenciales ya creadas
+    con 16 bytes deben seguir sirviendo -y las nuevas, mas largas, tambien-.
+    Por eso la sal se compara contra un minimo y no contra la constante.
+    """
+    sal = secrets.token_bytes(32)
+    digest = hashlib.pbkdf2_hmac("sha256", CONTRASENA.encode("utf-8"), sal, 1)
+
+    assert verificar_contrasena(CONTRASENA, f"{ALGORITMO}$1${sal.hex()}${digest.hex()}")
 
 
 def test_error_de_hash_corrupto_no_filtra_la_credencial() -> None:

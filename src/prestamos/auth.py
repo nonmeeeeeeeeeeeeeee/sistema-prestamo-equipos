@@ -41,6 +41,20 @@ ALGORITMO = "pbkdf2_sha256"
 ITERACIONES_PBKDF2 = 200_000
 BYTES_DE_SAL = 16
 
+# Largos que se exigen al *verificar*, distintos de la constante de generacion.
+#
+# El digest se compara exacto: un hash `pbkdf2_sha256` mide siempre lo que mide
+# el digest de SHA-256, porque `_derivar` no pasa `dklen`. Cualquier otro largo
+# es una credencial truncada o de otro algoritmo.
+#
+# La sal, en cambio, se compara contra un *minimo* y no contra `BYTES_DE_SAL`.
+# El largo de la sal viaja en la propia cadena y la verificacion no depende de
+# el, asi que exigir igualdad con la constante haria que subir `BYTES_DE_SAL`
+# invalidara todas las credenciales ya creadas: el mismo problema que se evito
+# leyendo las iteraciones de la cadena en vez de asumir la constante.
+LARGO_DEL_DIGEST = hashlib.sha256().digest_size
+LARGO_MINIMO_DE_SAL = 16
+
 # Un unico mensaje para "no existe" y para "contrasena incorrecta": distinguirlos
 # solo sirve para averiguar que cuentas existen. El usuario inactivo si tiene
 # mensaje propio, porque RN-02 es una regla verificable por separado.
@@ -132,8 +146,14 @@ def _descomponer(hash_almacenado: object) -> tuple[int, bytes, bytes]:
         digest = bytes.fromhex(digest_hex)
     except ValueError as exc:
         raise _hash_corrupto("hex_invalido") from exc
-    if not sal or not digest:
-        raise _hash_corrupto("campos_vacios")
+    if len(sal) < LARGO_MINIMO_DE_SAL:
+        # Cubre tambien la sal vacia. Una sal mas corta de lo que este modulo
+        # genero alguna vez solo puede venir de una credencial truncada, y sin
+        # esta comprobacion el hmac fallaria despues como "contrasena
+        # equivocada", escondiendo un archivo corrupto detras de un login malo.
+        raise _hash_corrupto("sal_demasiado_corta")
+    if len(digest) != LARGO_DEL_DIGEST:
+        raise _hash_corrupto("largo_de_digest_invalido")
 
     return iteraciones, sal, digest
 
