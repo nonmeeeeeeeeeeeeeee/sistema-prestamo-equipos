@@ -67,6 +67,22 @@ class EstadoPrestamo(str, Enum):
     DEVUELTA = "DEVUELTA"
 
 
+def normalizar_identificador(valor: Any) -> Any:
+    """Recorta los espacios de un id, correo o codigo antes de compararlo.
+
+    Los validadores de este modulo usan `strip()` solo para *comprobar* que un
+    campo no este vacio, pero guardan el texto crudo. Sin recortar tambien al
+    escribir, "u1 " y "u1" son dos registros distintos para el repositorio y el
+    mismo para cualquier persona, y un correo guardado con un espacio no vuelve
+    a coincidir con lo que su duena teclea al iniciar sesion.
+
+    Se recortan los espacios pero no se cambian las mayusculas: el caso si es
+    informacion -un correo se muestra como su duena lo escribio- y la
+    comparacion sin distinguir mayusculas se hace en el momento de comparar.
+    """
+    return valor.strip() if isinstance(valor, str) else valor
+
+
 def _texto_obligatorio(valor: Any, campo: str, regla: str) -> None:
     if not isinstance(valor, str) or not valor.strip():
         raise ErrorValidacion(
