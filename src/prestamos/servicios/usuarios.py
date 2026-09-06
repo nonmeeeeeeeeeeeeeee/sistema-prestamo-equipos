@@ -34,7 +34,7 @@ from typing import NoReturn
 from prestamos.auth import ITERACIONES_PBKDF2, ServicioAuth, hash_contrasena
 from prestamos.errores import ErrorValidacion
 from prestamos.logging_conf import registrar_evento
-from prestamos.modelos import Rol, Usuario
+from prestamos.modelos import Rol, Usuario, normalizar_identificador
 from prestamos.repositorios.fabricas import repositorio_usuarios
 from prestamos.repositorios.json_repo import RepositorioJson
 
@@ -44,6 +44,7 @@ from prestamos.repositorios.json_repo import RepositorioJson
 # y SUP-01 deja anotado que el modelo deberia ajustarse si el cliente lo define.
 # Hardcodear aqui el dominio de los datos de prueba seria inventar la regla.
 _CORREO_VALIDO = re.compile(r"^[^@\s]+@[^@\s]+$")
+
 
 
 class ServicioUsuarios:
@@ -116,6 +117,8 @@ class ServicioUsuarios:
         ocurre y queda en el log como dos eventos.
         """
         actor = self._auth.requiere_rol(Rol.ENCARGADO)
+        id_usuario = normalizar_identificador(id_usuario)
+        correo = normalizar_identificador(correo)
 
         self._validar_correo(correo, actor=actor, accion="usuario_registrado")
         self._exigir_id_libre(id_usuario, actor=actor, accion="usuario_registrado")
@@ -162,6 +165,7 @@ class ServicioUsuarios:
         actual = self._usuarios.obtener(id_usuario)
 
         if correo is not None:
+            correo = normalizar_identificador(correo)
             self._validar_correo(correo, actor=actor, accion="usuario_editado")
             # Excluir el propio registro: sin esto, reenviar el correo que el
             # usuario ya tiene -o editar solo el nombre- chocaria consigo mismo.
@@ -290,8 +294,8 @@ class ServicioUsuarios:
         if not isinstance(id_usuario, str) or not id_usuario.strip():
             # Deja que el modelo produzca el mensaje de campo obligatorio.
             return
-        buscado = id_usuario.casefold()
-        if any(u.id.casefold() == buscado for u in self._usuarios.listar()):
+        buscado = id_usuario.strip().casefold()
+        if any(u.id.strip().casefold() == buscado for u in self._usuarios.listar()):
             self._rechazar(
                 f"Ya existe un usuario con el id '{id_usuario}'.",
                 actor=actor,
@@ -318,7 +322,7 @@ class ServicioUsuarios:
         for usuario in self._usuarios.listar():
             if excluir_id is not None and usuario.id == excluir_id:
                 continue
-            if usuario.correo.casefold() == buscado:
+            if usuario.correo.strip().casefold() == buscado:
                 self._rechazar(
                     "Ya existe un usuario registrado con ese correo.",
                     actor=actor,
@@ -439,6 +443,8 @@ def crear_encargado_inicial(
     logren iniciar sesion. No se expone en la CLI ni en el menu (#14).
     """
     usuarios = repositorio or repositorio_usuarios(datos_dir)
+    id_usuario = normalizar_identificador(id_usuario)
+    correo = normalizar_identificador(correo)
 
     existentes = usuarios.listar()
     if existentes:

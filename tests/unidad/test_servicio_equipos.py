@@ -193,6 +193,20 @@ def test_no_se_reutiliza_el_codigo_de_un_equipo_dado_de_baja(
     assert "reactivar" in exc.value.mensaje
 
 
+def test_alta_rechaza_un_codigo_que_solo_difiere_en_espacios(
+    servicio, sesion_encargado
+) -> None:
+    _alta(servicio, codigo="M-01")
+
+    with pytest.raises(ErrorValidacion) as exc:
+        _alta(servicio, codigo=" M-01 ")
+    assert exc.value.detalles["motivo"] == "codigo_duplicado"
+
+
+def test_alta_recorta_los_espacios_del_codigo(servicio, sesion_encargado) -> None:
+    assert _alta(servicio, codigo="  M-01  ").codigo == "M-01"
+
+
 # ---------------------------------------------------------------- Edicion
 
 
@@ -304,6 +318,24 @@ def test_un_prestamo_de_otro_equipo_no_bloquea_la_baja(
     _prestamo(repo_prestamos, EstadoPrestamo.ENTREGADA, codigo="M-02")
 
     assert servicio.dar_de_baja("M-01").estado is EstadoEquipo.BAJA
+
+
+def test_baja_rechazada_por_prestamo_con_el_codigo_en_otras_mayusculas(
+    servicio, sesion_encargado, repo_prestamos
+) -> None:
+    """RN-04 considera "M-01" y "m-01" el mismo equipo, asi que el barrido de
+    RN-21 tambien debe hacerlo.
+
+    `Prestamo.equipos` guarda los codigos como texto suelto y nadie resuelve la
+    referencia: con una comparacion exacta, un prestamo activo sobre "m-01" no
+    bloqueaba la baja de "M-01".
+    """
+    _alta(servicio, codigo="M-01")
+    _prestamo(repo_prestamos, EstadoPrestamo.APROBADA, codigo="m-01")
+
+    with pytest.raises(ErrorValidacion) as exc:
+        servicio.dar_de_baja("M-01")
+    assert exc.value.detalles["motivo"] == "prestamo_activo"
 
 
 # ----------------------------------------------------------- Mantencion

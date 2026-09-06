@@ -197,6 +197,65 @@ def test_alta_rechaza_campos_obligatorios_vacios(servicio, sesion_encargado) -> 
         _alta_solicitante(servicio, nombre="   ")
 
 
+def test_alta_recorta_los_espacios_del_id_y_del_correo(
+    servicio, sesion_encargado, repo_usuarios
+) -> None:
+    """Los campos de identidad se guardan recortados.
+
+    `modelos.Usuario` usa `strip()` solo para comprobar que el campo no este
+    vacio, pero guarda el texto crudo; sin recortar al escribir, el correo
+    almacenado no vuelve a coincidir con lo que su duena teclea.
+    """
+    usuario = _alta_solicitante(
+        servicio, id_usuario="  u1  ", correo="  ana.perez@universidad.cl  "
+    )
+
+    assert usuario.id == "u1"
+    assert usuario.correo == "ana.perez@universidad.cl"
+    assert repo_usuarios.obtener("u1").id == "u1"
+
+
+def test_un_correo_con_espacios_no_deja_al_usuario_fuera(
+    servicio, auth, sesion_encargado
+) -> None:
+    _alta_solicitante(servicio, correo=" ana.perez@universidad.cl ")
+    auth.cerrar_sesion()
+
+    assert auth.iniciar_sesion("ana.perez@universidad.cl", CONTRASENA).usuario.id == "u1"
+
+
+def test_alta_rechaza_un_id_que_solo_difiere_en_espacios(
+    servicio, sesion_encargado
+) -> None:
+    _alta_solicitante(servicio, id_usuario="u1")
+
+    with pytest.raises(ErrorValidacion) as exc:
+        _alta_solicitante(servicio, id_usuario=" u1 ", correo="otra@universidad.cl")
+    assert exc.value.detalles["motivo"] == "id_duplicado"
+
+
+def test_alta_rechaza_un_correo_que_solo_difiere_en_espacios(
+    servicio, sesion_encargado
+) -> None:
+    _alta_solicitante(servicio, correo="ana.perez@universidad.cl")
+
+    with pytest.raises(ErrorValidacion) as exc:
+        _alta_solicitante(
+            servicio, id_usuario="u2", correo=" ana.perez@universidad.cl "
+        )
+    assert exc.value.detalles["motivo"] == "correo_duplicado"
+
+
+def test_el_encargado_inicial_tambien_recorta_espacios(repo_usuarios) -> None:
+    encargado = crear_encargado_inicial(
+        "  enc  ", "Encargada", "  " + CORREO_ENCARGADO + "  ", CONTRASENA,
+        repositorio=repo_usuarios, iteraciones_hash=1,
+    )
+
+    assert encargado.id == "enc"
+    assert encargado.correo == CORREO_ENCARGADO
+
+
 # ---------------------------------------------------------------- Edicion
 
 
@@ -355,7 +414,7 @@ def test_un_encargado_inactivo_no_cuenta_como_relevo(servicio, sesion_encargado)
 # ------------------------------------------------------------ Contrasena
 
 
-def test_cambiar_contrasena_invalida_la_anterior(
+def test_cambiar_contrasena_permite_entrar_con_la_nueva(
     servicio, auth, sesion_encargado
 ) -> None:
     _alta_solicitante(servicio)

@@ -5,8 +5,11 @@ es el dueno de RN-04: campos obligatorios y codigo unico.
 
 `Equipo.estado` tiene dos duenos distintos y este servicio solo es uno de ellos:
 
-- `DISPONIBLE`, `RESERVADO` y `PRESTADO` los escribe el ciclo de vida del
-  prestamo (`ServicioPrestamos`) a medida que el equipo sale y vuelve.
+- `DISPONIBLE`, `RESERVADO` y `PRESTADO` pertenecen al ciclo de vida del
+  prestamo. Hoy `ServicioPrestamos` solo escribe `PRESTADO` al entregar y
+  `DISPONIBLE` al devolver o liberar; `RESERVADO` todavia no lo escribe nadie,
+  porque la aprobacion (#11) es un stub. Ese hueco es justamente el motivo de
+  que la guarda de RN-21 consulte los prestamos y no este campo.
 - `MANTENCION` y `BAJA` son decisiones administrativas del Encargado, y son las
   que viven aqui.
 
@@ -27,7 +30,14 @@ from typing import NoReturn
 from prestamos.auth import ServicioAuth
 from prestamos.errores import ErrorValidacion
 from prestamos.logging_conf import registrar_evento
-from prestamos.modelos import Equipo, EstadoEquipo, Prestamo, Rol, Usuario
+from prestamos.modelos import (
+    Equipo,
+    EstadoEquipo,
+    Prestamo,
+    Rol,
+    Usuario,
+    normalizar_identificador,
+)
 from prestamos.reglas import ESTADOS_DISPONIBILIDAD_BLOQUEADA
 from prestamos.repositorios.fabricas import repositorio_equipos, repositorio_prestamos
 from prestamos.repositorios.json_repo import RepositorioJson
@@ -85,7 +95,7 @@ class ServicioEquipos:
     def obtener(self, codigo: str) -> Equipo:
         """Un equipo por codigo; `RecursoNoEncontrado` si no existe."""
         self._auth.requiere_sesion()
-        return self._equipos.obtener(codigo)
+        return self._equipos.obtener(normalizar_identificador(codigo))
 
     def registrar_equipo(
         self,
@@ -102,6 +112,7 @@ class ServicioEquipos:
         luego `enviar_a_mantencion`, que deja los dos hechos en el log.
         """
         actor = self._auth.requiere_rol(Rol.ENCARGADO)
+        codigo = normalizar_identificador(codigo)
         self._exigir_codigo_libre(codigo, actor=actor)
 
         equipo = Equipo(
@@ -131,7 +142,7 @@ class ServicioEquipos:
         todo el historial de prestamos de ese equipo.
         """
         actor = self._auth.requiere_rol(Rol.ENCARGADO)
-        actual = self._equipos.obtener(codigo)
+        actual = self._equipos.obtener(normalizar_identificador(codigo))
 
         actualizado = replace(
             actual,
@@ -200,7 +211,7 @@ class ServicioEquipos:
         preserva frente a un borrado.
         """
         actor = self._auth.requiere_rol(Rol.ENCARGADO)
-        actual = self._equipos.obtener(codigo)
+        actual = self._equipos.obtener(normalizar_identificador(codigo))
 
         if actual.estado is EstadoEquipo.DISPONIBLE:
             return actual
@@ -235,6 +246,7 @@ class ServicioEquipos:
     ) -> Equipo:
         """Tronco comun de `dar_de_baja` y `enviar_a_mantencion`."""
         actor = self._auth.requiere_rol(Rol.ENCARGADO)
+        codigo = normalizar_identificador(codigo)
         actual = self._equipos.obtener(codigo)
         if actual.estado is destino:
             return actual
@@ -266,9 +278,9 @@ class ServicioEquipos:
         if not isinstance(codigo, str) or not codigo.strip():
             # Deja que el modelo produzca el mensaje de campo obligatorio.
             return
-        buscado = codigo.casefold()
+        buscado = codigo.strip().casefold()
         for equipo in self._equipos.listar():
-            if equipo.codigo.casefold() != buscado:
+            if equipo.codigo.strip().casefold() != buscado:
                 continue
             motivo = (
                 "codigo_dado_de_baja"
@@ -311,10 +323,16 @@ class ServicioEquipos:
         bloquear el mantenimiento dejando solicitudes abiertas. Esa solicitud
         muere despues en la aprobacion, que revalida RN-05.
         """
+        # Comparacion sin distinguir mayusculas ni espacios, igual que la
+        # unicidad de RN-04. `Prestamo.equipos` guarda los codigos como texto
+        # suelto y nadie resuelve la referencia, asi que un `in` exacto dejaria
+        # que un prestamo sobre "m-01" no bloqueara la baja de "M-01" -dos
+        # codigos que RN-04 considera el mismo equipo-.
+        buscado = codigo.strip().casefold()
         bloqueantes = [
             prestamo
             for prestamo in self._prestamos.listar()
-            if codigo in prestamo.equipos
+            if any(c.strip().casefold() == buscado for c in prestamo.equipos)
             and prestamo.estado in ESTADOS_DISPONIBILIDAD_BLOQUEADA
         ]
         if bloqueantes:
