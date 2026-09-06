@@ -1,4 +1,4 @@
-"""Pruebas unitarias del caso de uso de prestamos (issue #12)."""
+"""Pruebas unitarias del servicio de prestamos (issues #12 y #13)"""
 
 from __future__ import annotations
 
@@ -50,16 +50,18 @@ def equipo(
 def prestamo(
     *,
     id_prestamo: str = "P-01",
+    id_solicitante: str = "sol-1",
     estado: EstadoPrestamo = EstadoPrestamo.APROBADA,
     equipos: tuple[str, ...] = ("EQ-01",),
     fecha_inicio: date = date(2026, 9, 8),
     fecha_termino: date = date(2026, 9, 10),
     fecha_aprobacion: date | None = date(2026, 9, 7),
     fecha_entrega: date | None = None,
+    fecha_devolucion: date | None = None,
 ) -> Prestamo:
     return Prestamo(
         id=id_prestamo,
-        id_solicitante="sol-1",
+        id_solicitante=id_solicitante,
         equipos=equipos,
         motivo="Proyecto de electronica",
         estado=estado,
@@ -68,6 +70,7 @@ def prestamo(
         fecha_termino=fecha_termino,
         fecha_aprobacion=fecha_aprobacion,
         fecha_entrega=fecha_entrega,
+        fecha_devolucion=fecha_devolucion,
     )
 
 
@@ -445,3 +448,265 @@ def test_toda_operacion_pasa_por_motor_de_reglas(
         EventoTransicion.REGISTRAR_DEVOLUCION,
         EventoTransicion.CANCELAR_SOLICITUD,
     ]
+
+
+def test_consultas_clasifican_futuros_vigentes_y_atrasados_con_limites_de_fecha(
+    servicio: ServicioPrestamos,
+    repo_prestamos: RepositorioJson[Prestamo],
+) -> None:
+    hoy = date(2026, 9, 10)
+    for solicitud in [
+        prestamo(
+            id_prestamo="FUTURO",
+            estado=EstadoPrestamo.APROBADA,
+            fecha_inicio=date(2026, 9, 11),
+            fecha_termino=date(2026, 9, 14),
+        ),
+        prestamo(
+            id_prestamo="APROBADA_HOY",
+            estado=EstadoPrestamo.APROBADA,
+            fecha_inicio=hoy,
+            fecha_termino=date(2026, 9, 11),
+        ),
+        prestamo(
+            id_prestamo="VIGENTE_INICIO",
+            estado=EstadoPrestamo.ENTREGADA,
+            fecha_inicio=hoy,
+            fecha_termino=date(2026, 9, 12),
+            fecha_entrega=hoy,
+        ),
+        prestamo(
+            id_prestamo="VIGENTE_TERMINO",
+            estado=EstadoPrestamo.ENTREGADA,
+            fecha_inicio=date(2026, 9, 8),
+            fecha_termino=hoy,
+            fecha_entrega=date(2026, 9, 8),
+        ),
+        prestamo(
+            id_prestamo="ATRASADO_ESTADO",
+            estado=EstadoPrestamo.ATRASADA,
+            fecha_inicio=date(2026, 9, 8),
+            fecha_termino=date(2026, 9, 9),
+            fecha_entrega=date(2026, 9, 8),
+        ),
+        prestamo(
+            id_prestamo="ATRASADO_CALCULADO",
+            estado=EstadoPrestamo.ENTREGADA,
+            fecha_inicio=date(2026, 9, 7),
+            fecha_termino=date(2026, 9, 9),
+            fecha_entrega=date(2026, 9, 7),
+        ),
+        prestamo(
+            id_prestamo="DEVUELTA_NO_APARECE",
+            estado=EstadoPrestamo.DEVUELTA,
+            fecha_inicio=date(2026, 9, 7),
+            fecha_termino=date(2026, 9, 9),
+            fecha_entrega=date(2026, 9, 7),
+            fecha_devolucion=hoy,
+        ),
+    ]:
+        repo_prestamos.guardar(solicitud)
+
+    encargado = usuario("enc-1", Rol.ENCARGADO)
+
+    assert [p.id for p in servicio.prestamos_futuros(encargado, fecha_actual=hoy)] == [
+        "FUTURO"
+    ]
+    assert [p.id for p in servicio.prestamos_vigentes(encargado, fecha_actual=hoy)] == [
+        "VIGENTE_INICIO",
+        "VIGENTE_TERMINO",
+    ]
+    assert [p.id for p in servicio.prestamos_atrasados(encargado, fecha_actual=hoy)] == [
+        "ATRASADO_ESTADO",
+        "ATRASADO_CALCULADO",
+    ]
+
+
+def test_encargado_ve_todos_los_prestamos_en_consultas(
+    servicio: ServicioPrestamos,
+    repo_prestamos: RepositorioJson[Prestamo],
+) -> None:
+    hoy = date(2026, 9, 10)
+    repo_prestamos.guardar(
+        prestamo(
+            id_prestamo="SOL1",
+            id_solicitante="sol-1",
+            estado=EstadoPrestamo.APROBADA,
+            fecha_inicio=date(2026, 9, 11),
+            fecha_termino=date(2026, 9, 14),
+        )
+    )
+    repo_prestamos.guardar(
+        prestamo(
+            id_prestamo="SOL2",
+            id_solicitante="sol-2",
+            estado=EstadoPrestamo.APROBADA,
+            fecha_inicio=date(2026, 9, 11),
+            fecha_termino=date(2026, 9, 14),
+        )
+    )
+
+    resultado = servicio.prestamos_futuros(
+        usuario("enc-1", Rol.ENCARGADO),
+        fecha_actual=hoy,
+    )
+
+    assert [p.id for p in resultado] == ["SOL1", "SOL2"]
+
+
+def test_consultas_aplican_filtros_por_usuario_y_equipo_para_encargado(
+    servicio: ServicioPrestamos,
+    repo_prestamos: RepositorioJson[Prestamo],
+) -> None:
+    hoy = date(2026, 9, 10)
+    repo_prestamos.guardar(
+        prestamo(
+            id_prestamo="SOL1_EQ1",
+            id_solicitante="sol-1",
+            estado=EstadoPrestamo.APROBADA,
+            equipos=("EQ-01",),
+            fecha_inicio=date(2026, 9, 11),
+            fecha_termino=date(2026, 9, 14),
+        )
+    )
+    repo_prestamos.guardar(
+        prestamo(
+            id_prestamo="SOL2_EQ1_EQ2",
+            id_solicitante="sol-2",
+            estado=EstadoPrestamo.APROBADA,
+            equipos=("EQ-01", "EQ-02"),
+            fecha_inicio=date(2026, 9, 11),
+            fecha_termino=date(2026, 9, 14),
+        )
+    )
+    repo_prestamos.guardar(
+        prestamo(
+            id_prestamo="SOL2_EQ3",
+            id_solicitante="sol-2",
+            estado=EstadoPrestamo.APROBADA,
+            equipos=("EQ-03",),
+            fecha_inicio=date(2026, 9, 11),
+            fecha_termino=date(2026, 9, 14),
+        )
+    )
+
+    resultado = servicio.prestamos_futuros(
+        usuario("enc-1", Rol.ENCARGADO),
+        fecha_actual=hoy,
+        id_usuario="sol-2",
+        codigo_equipo="EQ-02",
+    )
+
+    assert [p.id for p in resultado] == ["SOL2_EQ1_EQ2"]
+
+
+def test_solicitante_solo_consulta_prestamos_propios(
+    servicio: ServicioPrestamos,
+    repo_prestamos: RepositorioJson[Prestamo],
+) -> None:
+    hoy = date(2026, 9, 10)
+    repo_prestamos.guardar(
+        prestamo(
+            id_prestamo="PROPIO",
+            id_solicitante="sol-1",
+            estado=EstadoPrestamo.APROBADA,
+            fecha_inicio=date(2026, 9, 11),
+            fecha_termino=date(2026, 9, 14),
+        )
+    )
+    repo_prestamos.guardar(
+        prestamo(
+            id_prestamo="AJENO",
+            id_solicitante="sol-2",
+            estado=EstadoPrestamo.APROBADA,
+            fecha_inicio=date(2026, 9, 11),
+            fecha_termino=date(2026, 9, 14),
+        )
+    )
+
+    assert [
+        p.id for p in servicio.prestamos_futuros(usuario(), fecha_actual=hoy)
+    ] == ["PROPIO"]
+
+    with pytest.raises(ErrorAutorizacion) as exc_info:
+        servicio.prestamos_futuros(
+            usuario(),
+            fecha_actual=hoy,
+            id_usuario="sol-2",
+        )
+
+    assert exc_info.value.regla == "RN-19"
+    assert "RN-19" in exc_info.value.mensaje
+
+
+def test_consultas_validan_usuario_inactivo_o_ausente_y_filtros_vacios(
+    servicio: ServicioPrestamos,
+) -> None:
+    with pytest.raises(ErrorAutorizacion) as exc_inactivo:
+        servicio.prestamos_vigentes(
+            Usuario(
+                id="enc-1",
+                nombre="Encargado",
+                correo="enc-1@usm.cl",
+                rol=Rol.ENCARGADO,
+                activo=False,
+                hash_contrasena="pbkdf2$1$sal$digest",
+            ),
+            fecha_actual=date(2026, 9, 10),
+        )
+
+    assert exc_inactivo.value.regla == "RN-02"
+
+    with pytest.raises(ErrorAutorizacion) as exc_ausente:
+        servicio.prestamos_futuros(
+            None,
+            fecha_actual=date(2026, 9, 10),
+        )
+
+    assert exc_ausente.value.regla == "RN-02"
+
+    with pytest.raises(ErrorValidacion) as exc_equipo:
+        servicio.prestamos_atrasados(
+            usuario("enc-1", Rol.ENCARGADO),
+            fecha_actual=date(2026, 9, 10),
+            codigo_equipo=" ",
+        )
+
+    assert exc_equipo.value.regla == "RN-17"
+
+    with pytest.raises(ErrorValidacion) as exc_usuario:
+        servicio.prestamos_futuros(
+            usuario("enc-1", Rol.ENCARGADO),
+            fecha_actual=date(2026, 9, 10),
+            id_usuario=" ",
+        )
+
+    assert exc_usuario.value.regla == "RN-17"
+
+
+def test_consultas_no_modifican_ni_persisten_estados(
+    servicio: ServicioPrestamos,
+    repo_prestamos: RepositorioJson[Prestamo],
+    repo_equipos: RepositorioJson[Equipo],
+) -> None:
+    vencido_sin_marcar = prestamo(
+        id_prestamo="VENCIDO_SIN_MARCAR",
+        estado=EstadoPrestamo.ENTREGADA,
+        fecha_inicio=date(2026, 9, 7),
+        fecha_termino=date(2026, 9, 9),
+        fecha_entrega=date(2026, 9, 7),
+    )
+    repo_prestamos.guardar(vencido_sin_marcar)
+    repo_equipos.guardar(equipo(estado=EstadoEquipo.PRESTADO))
+    prestamos_antes = [p.a_dict() for p in repo_prestamos.listar()]
+    equipos_antes = [e.a_dict() for e in repo_equipos.listar()]
+
+    resultado = servicio.prestamos_atrasados(
+        usuario("enc-1", Rol.ENCARGADO),
+        fecha_actual=date(2026, 9, 10),
+    )
+
+    assert [p.id for p in resultado] == ["VENCIDO_SIN_MARCAR"]
+    assert repo_prestamos.obtener("VENCIDO_SIN_MARCAR").estado is EstadoPrestamo.ENTREGADA
+    assert [p.a_dict() for p in repo_prestamos.listar()] == prestamos_antes
+    assert [e.a_dict() for e in repo_equipos.listar()] == equipos_antes
